@@ -279,15 +279,8 @@ try {
                     <div class="page-header">
                         <div>
                             <h1>Patients</h1>
-                            <p>Manage patient records</p>
+                            <p>View and manage patient records</p>
                         </div>
-                        <button class="btn btn-primary" onclick="openAddPatientModal()">
-                            <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                            <span>Add Patient</span>
-                        </button>
                     </div>
 
                     <div class="card">
@@ -325,8 +318,7 @@ try {
                                     <thead>
                                         <tr>
                                             <th>Type</th>
-                                            <th>First Name</th>
-                                            <th>Last Name</th>
+                                            <th colspan="2">Patient Name</th>
                                             <th>Age</th>
                                             <th>Contact</th>
                                             <th>Level/Department</th>
@@ -863,6 +855,255 @@ try {
                     <button type="submit" class="btn btn-primary">Save Appointment</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Patient Details Modal -->
+    <div class="modal" id="patientDetailsModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="patientDetailsTitle">Patient Details</h2>
+                <button class="modal-close" onclick="closePatientDetailsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Patient Information Card -->
+                <div class="patient-info-card">
+                    <div class="patient-header">
+                        <div class="patient-avatar">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div class="patient-basic-info">
+                            <h3 id="patientFullName"></h3>
+                            <p id="patientTypeInfo"></p>
+                            <div class="patient-meta">
+                                <span id="patientAgeGender"></span>
+                            </div>
+                        </div>
+                        <div class="patient-actions">
+                            <button class="btn btn-secondary" onclick="editPatientRecord()" id="editPatientBtn">
+                                <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Appointment History -->
+                <div class="card" style="margin-top: 20px;">
+                    <div class="card-header">
+                        <h2>Appointment History</h2>
+                        <button class="btn btn-primary btn-sm" onclick="addNewRecordForPatient()">
+                            <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            New Record
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="appointmentHistoryList" class="history-list">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Patient Record View/Edit Modal -->
+    <div class="modal" id="patientRecordModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2 id="recordModalTitle">Appointment Record</h2>
+                <button class="modal-close" onclick="closePatientRecordModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- View Mode -->
+                <div id="recordViewMode">
+                    <div class="record-view-card">
+                        <div class="record-section">
+                            <h3>Time and Date of Visit</h3>
+                            <div class="record-info">
+                                <p><strong>Date:</strong> <span id="viewRecordDate"></span></p>
+                                <p><strong>Time:</strong> <span id="viewRecordTime"></span></p>
+                            </div>
+                        </div>
+
+                        <div class="record-section">
+                            <h3>Reason for Clinic Visit</h3>
+                            <p id="viewRecordReason"></p>
+                        </div>
+
+                        <div class="record-section">
+                            <h3>Vitals</h3>
+                            <div class="vitals-grid">
+                                <div class="vital-item">
+                                    <label>BP:</label>
+                                    <span id="viewBP"></span>
+                                </div>
+                                <div class="vital-item">
+                                    <label>RR:</label>
+                                    <span id="viewRR"></span>
+                                </div>
+                                <div class="vital-item">
+                                    <label>TEMP:</label>
+                                    <span id="viewTemp"></span>
+                                </div>
+                                <div class="vital-item">
+                                    <label>Weight:</label>
+                                    <span id="viewWeight"></span>
+                                </div>
+                                <div class="vital-item">
+                                    <label>HR:</label>
+                                    <span id="viewHR"></span>
+                                </div>
+                                <div class="vital-item">
+                                    <label>O₂ SAT:</label>
+                                    <span id="viewO2Sat"></span>
+                                </div>
+                                <div class="vital-item">
+                                    <label>Height:</label>
+                                    <span id="viewHeight"></span>
+                                </div>
+                                <div class="vital-item">
+                                    <label>BMI:</label>
+                                    <span id="viewBMI"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="record-section">
+                            <h3>Prior s/sx</h3>
+                            <p id="viewPriorSsx"></p>
+                        </div>
+
+                        <div class="record-section">
+                            <h3>Present s/sx</h3>
+                            <p id="viewPresentSsx"></p>
+                        </div>
+
+                        <div class="record-section">
+                            <h3>Intervention</h3>
+                            <p id="viewIntervention"></p>
+                        </div>
+
+                        <div class="modal-footer">
+                            <div id="pastRecordInfo" class="past-record-notice" style="display: none; flex: 1; align-items: center; color: #6c757d; font-size: 14px;">
+                                <svg style="width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                This is a past record and cannot be edited
+                            </div>
+                            <div style="display: flex; gap: var(--space-lg);">
+                                <button type="button" class="btn btn-secondary" onclick="closePatientRecordModal()">Close</button>
+                                <button type="button" id="viewModeEditBtn" class="btn btn-primary" onclick="switchToEditMode()">Edit</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit Mode -->
+                <div id="recordEditMode" style="display: none;">
+                    <form id="patientRecordForm">
+                        <input type="hidden" id="recordId" name="recordId">
+                        <input type="hidden" id="recordPatientId" name="patientId">
+                        <input type="hidden" id="recordPatientType" name="patientType">
+
+                        <div class="form-section">
+                            <h3>Time and Date of Visit</h3>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="recordDate">Date *</label>
+                                    <input type="date" id="recordDate" name="recordDate" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordTime">Time *</label>
+                                    <input type="time" id="recordTime" name="recordTime" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Reason for Clinic Visit</h3>
+                            <div class="form-group">
+                                <textarea id="recordReason" name="reason" rows="3" placeholder="Enter reason for visit"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Vitals</h3>
+                            <div class="vitals-form-grid">
+                                <div class="form-group">
+                                    <label for="recordBP">BP:</label>
+                                    <input type="text" id="recordBP" name="bp" placeholder="120/80">
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordRR">RR:</label>
+                                    <input type="text" id="recordRR" name="rr" placeholder="16">
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordTemp">TEMP:</label>
+                                    <input type="text" id="recordTemp" name="temp" placeholder="36.5">
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordWeight">Weight (kg):</label>
+                                    <input type="text" id="recordWeight" name="weight" placeholder="e.g., 65">
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordHR">HR:</label>
+                                    <input type="text" id="recordHR" name="hr" placeholder="72">
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordO2Sat">O₂ SAT:</label>
+                                    <input type="text" id="recordO2Sat" name="o2sat" placeholder="98%">
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordHeight">Height (cm):</label>
+                                    <input type="text" id="recordHeight" name="height" placeholder="e.g., 170">
+                                </div>
+                                <div class="form-group">
+                                    <label for="recordBMI">BMI:</label>
+                                    <input type="text" id="recordBMI" name="bmi" placeholder="Auto-calculated" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Prior s/sx</h3>
+                            <div class="form-group">
+                                <textarea id="recordPriorSsx" name="priorSsx" rows="3" placeholder="Previous signs/symptoms"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Present s/sx</h3>
+                            <div class="form-group">
+                                <textarea id="recordPresentSsx" name="presentSsx" rows="3" placeholder="Current signs/symptoms"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Intervention</h3>
+                            <div class="form-group">
+                                <textarea id="recordIntervention" name="intervention" rows="3" placeholder="Treatment/intervention provided"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="cancelEditMode()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
 

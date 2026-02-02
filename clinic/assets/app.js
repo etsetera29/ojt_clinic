@@ -545,11 +545,16 @@ function renderPatients(patients) {
             levelInfo = `${patient.employee_type || 'N/A'} - ${patient.department || 'N/A'}`;
         }
         
+        const fullName = `${patient.first_name} ${patient.last_name}`;
+        
         return `
         <tr>
             <td><span class="badge badge-${patient.patient_type.toLowerCase()}">${patient.patient_type}</span></td>
-            <td>${patient.first_name}</td>
-            <td>${patient.last_name}</td>
+            <td colspan="2">
+                <a href="#" class="patient-name-link" onclick="openPatientDetails(${patient.id}, '${patient.patient_type}'); return false;">
+                    ${fullName}
+                </a>
+            </td>
             <td>${patient.age || 'N/A'}</td>
             <td>${patient.phone || 'N/A'}</td>
             <td>${levelInfo}</td>
@@ -558,7 +563,7 @@ function renderPatients(patients) {
                     <button class="btn btn-sm btn-secondary" onclick="editPatient(${patient.id}, '${patient.patient_type}')">
                         Edit
                     </button>
-                    <button class="btn btn-sm btn-danger" onclick="confirmDeletePatient(${patient.id}, '${patient.first_name} ${patient.last_name}', '${patient.patient_type}')">
+                    <button class="btn btn-sm btn-danger" onclick="confirmDeletePatient(${patient.id}, '${fullName.replace(/'/g, "\\'")}', '${patient.patient_type}')">
                         Delete
                     </button>
                 </div>
@@ -1480,3 +1485,412 @@ function showAlert(message, type = 'info') {
         setTimeout(() => alert.remove(), 300);
     }, 3000);
 }
+
+// ==========================================
+// PATIENT DETAILS MODAL FUNCTIONS
+// ==========================================
+let currentPatient = null;
+let currentRecord = null;
+
+function openPatientDetails(patientId, patientType) {
+    currentPatient = { id: patientId, type: patientType };
+    
+    // Load patient information
+    const formData = new FormData();
+    formData.append('action', 'getPatient');
+    formData.append('id', patientId);
+    formData.append('type', patientType);
+    
+    fetch('ajax/patients.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayPatientInfo(data.patient);
+            loadPatientAppointmentHistory(patientId, patientType);
+            document.getElementById('patientDetailsModal').classList.add('active');
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displayPatientInfo(patient) {
+    const fullName = `${patient.first_name} ${patient.last_name}`;
+    let typeInfo = '';
+    
+    if (patient.patient_type === 'Student') {
+        typeInfo = `${patient.education_level || ''} - ${patient.course_track || ''}`;
+    } else {
+        typeInfo = `${patient.employee_type || ''} - ${patient.department || ''}`;
+    }
+    
+    document.getElementById('patientFullName').textContent = fullName;
+    document.getElementById('patientTypeInfo').innerHTML = `
+        <span class="badge badge-${patient.patient_type.toLowerCase()}">${patient.patient_type}</span> ${typeInfo}
+    `;
+    document.getElementById('patientAgeGender').textContent = `Age: ${patient.age || 'N/A'} • Gender: ${patient.gender || 'N/A'}`;
+}
+
+function loadPatientAppointmentHistory(patientId, patientType) {
+    const formData = new FormData();
+    formData.append('action', 'getPatientHistory');
+    formData.append('patientId', patientId);
+    formData.append('patientType', patientType);
+    
+    fetch('ajax/records.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            renderAppointmentHistory(data.records);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function renderAppointmentHistory(records) {
+    const container = document.getElementById('appointmentHistoryList');
+    
+    if (!records || records.length === 0) {
+        container.innerHTML = '<div class="history-empty">No appointment history found</div>';
+        return;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    container.innerHTML = records.map(record => {
+        const recordDate = new Date(record.appointment_date);
+        const isPast = recordDate < today;
+        
+        // Check if record has been saved (has any data in notes/reason or is completed)
+        const isSaved = record.status === 'completed' || (record.reason && record.reason.trim() !== '');
+        const isLocked = isPast || isSaved;
+        
+        const badgeClass = isLocked ? 'history-badge-locked' : 'history-badge-editable';
+        const badgeText = isLocked ? '🔒 Locked' : '📝 Editable';
+        
+        return `
+        <div class="history-item ${isLocked ? 'history-item-locked' : ''}" onclick="viewPatientRecord(${record.id})">
+            <div class="history-item-header">
+                <span class="history-date">${formatDate(record.appointment_date)}</span>
+                <span class="history-time">${formatTime(record.appointment_time)}</span>
+            </div>
+            <div class="history-reason">${record.reason || record.notes || 'No reason specified'}</div>
+            <span class="history-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        `;
+    }).join('');
+}
+
+function closePatientDetailsModal() {
+    document.getElementById('patientDetailsModal').classList.remove('active');
+    currentPatient = null;
+}
+
+function editPatientRecord() {
+    if (currentPatient) {
+        editPatient(currentPatient.id, currentPatient.type);
+        closePatientDetailsModal();
+    }
+}
+
+// ==========================================
+// PATIENT RECORD VIEW/EDIT FUNCTIONS
+// ==========================================
+function viewPatientRecord(recordId) {
+    currentRecord = recordId;
+    
+    const formData = new FormData();
+    formData.append('action', 'getRecord');
+    formData.append('recordId', recordId);
+    
+    fetch('ajax/records.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayRecordView(data.record);
+            document.getElementById('patientRecordModal').classList.add('active');
+            document.getElementById('recordViewMode').style.display = 'block';
+            document.getElementById('recordEditMode').style.display = 'none';
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displayRecordView(record) {
+    // Add orange background for view mode
+    const viewCard = document.querySelector('.record-view-card');
+    viewCard.classList.add('view-mode');
+    
+    document.getElementById('recordModalTitle').textContent = 'Appointment Record - View';
+    document.getElementById('viewRecordDate').textContent = formatDate(record.appointment_date);
+    document.getElementById('viewRecordTime').textContent = formatTime(record.appointment_time);
+    document.getElementById('viewRecordReason').textContent = record.reason || 'Not specified';
+    
+    // Vitals
+    document.getElementById('viewBP').textContent = record.bp || '';
+    document.getElementById('viewRR').textContent = record.rr || '';
+    document.getElementById('viewTemp').textContent = record.temp || '';
+    
+    // Weight - show just "kg" if empty, or value + " kg" if present
+    if (record.weight) {
+        document.getElementById('viewWeight').textContent = record.weight;
+    } else {
+        document.getElementById('viewWeight').textContent = 'kg';
+    }
+    
+    document.getElementById('viewHR').textContent = record.hr || '';
+    document.getElementById('viewO2Sat').textContent = record.o2sat || '';
+    
+    // Height - show just "cm" if empty, or value + " cm" if present  
+    if (record.height) {
+        document.getElementById('viewHeight').textContent = record.height;
+    } else {
+        document.getElementById('viewHeight').textContent = 'cm';
+    }
+    
+    // Calculate BMI if not present but height and weight are available
+    let bmiValue = record.bmi || '';
+    if (!bmiValue && record.height && record.weight) {
+        const height = parseFloat(record.height);
+        const weight = parseFloat(record.weight);
+        if (height > 0 && weight > 0) {
+            const heightInMeters = height / 100;
+            const bmi = weight / (heightInMeters * heightInMeters);
+            bmiValue = bmi.toFixed(1);
+        }
+    }
+    document.getElementById('viewBMI').textContent = bmiValue;
+    
+    document.getElementById('viewPriorSsx').textContent = record.prior_ssx || 'Not specified';
+    document.getElementById('viewPresentSsx').textContent = record.present_ssx || 'Not specified';
+    document.getElementById('viewIntervention').textContent = record.intervention || 'Not specified';
+    
+    // Check if record has been saved (has vitals record or is from the past)
+    const recordDate = new Date(record.appointment_date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Check if record has vitals data saved
+    const hasVitalsData = record.bp || record.rr || record.temp || record.weight || 
+                          record.hr || record.o2sat || record.height || record.bmi || 
+                          record.prior_ssx || record.present_ssx || record.intervention;
+    
+    const isPastRecord = recordDate < today;
+    const isLocked = hasVitalsData || isPastRecord;
+    
+    const editButton = document.getElementById('viewModeEditBtn');
+    const pastRecordInfo = document.getElementById('pastRecordInfo');
+    
+    if (editButton && pastRecordInfo) {
+        if (isLocked) {
+            // Record is locked - hide edit button and show info
+            editButton.style.display = 'none';
+            pastRecordInfo.style.display = 'flex';
+            
+            if (hasVitalsData && !isPastRecord) {
+                pastRecordInfo.innerHTML = `
+                    <svg style="width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                    This record has been saved and cannot be edited. Create a new record for any updates.
+                `;
+            } else if (isPastRecord) {
+                pastRecordInfo.innerHTML = `
+                    <svg style="width: 16px; height: 16px; margin-right: 8px; flex-shrink: 0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    This is a past record and cannot be edited.
+                `;
+            }
+        } else {
+            // Record is new/unsaved - show edit button
+            editButton.style.display = 'inline-flex';
+            pastRecordInfo.style.display = 'none';
+        }
+    }
+}
+
+function switchToEditMode() {
+    if (!currentRecord) return;
+    
+    const formData = new FormData();
+    formData.append('action', 'getRecord');
+    formData.append('recordId', currentRecord);
+    
+    fetch('ajax/records.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayRecordEdit(data.record);
+            document.getElementById('recordViewMode').style.display = 'none';
+            document.getElementById('recordEditMode').style.display = 'block';
+            document.getElementById('recordModalTitle').textContent = 'Appointment Record - Edit';
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function displayRecordEdit(record) {
+    document.getElementById('recordId').value = record.id;
+    document.getElementById('recordPatientId').value = record.patient_id;
+    document.getElementById('recordPatientType').value = record.patient_type;
+    document.getElementById('recordDate').value = record.appointment_date;
+    document.getElementById('recordTime').value = record.appointment_time;
+    document.getElementById('recordReason').value = record.reason || '';
+    
+    // Vitals
+    document.getElementById('recordBP').value = record.bp || '';
+    document.getElementById('recordRR').value = record.rr || '';
+    document.getElementById('recordTemp').value = record.temp || '';
+    document.getElementById('recordWeight').value = record.weight || '';
+    document.getElementById('recordHR').value = record.hr || '';
+    document.getElementById('recordO2Sat').value = record.o2sat || '';
+    document.getElementById('recordHeight').value = record.height || '';
+    document.getElementById('recordBMI').value = record.bmi || '';
+    
+    document.getElementById('recordPriorSsx').value = record.prior_ssx || '';
+    document.getElementById('recordPresentSsx').value = record.present_ssx || '';
+    document.getElementById('recordIntervention').value = record.intervention || '';
+    
+    // Recalculate BMI if height and weight are present
+    calculateBMI();
+}
+
+function cancelEditMode() {
+    if (currentRecord) {
+        viewPatientRecord(currentRecord);
+    }
+}
+
+function closePatientRecordModal() {
+    document.getElementById('patientRecordModal').classList.remove('active');
+    currentRecord = null;
+    
+    // Remove orange background class
+    const viewCard = document.querySelector('.record-view-card');
+    if (viewCard) {
+        viewCard.classList.remove('view-mode');
+    }
+}
+
+function addNewRecordForPatient() {
+    if (!currentPatient) return;
+    
+    // Reset form
+    document.getElementById('patientRecordForm').reset();
+    document.getElementById('recordId').value = '';
+    document.getElementById('recordPatientId').value = currentPatient.id;
+    document.getElementById('recordPatientType').value = currentPatient.type;
+    
+    // Set current date and time
+    const now = new Date();
+    document.getElementById('recordDate').value = now.toISOString().split('T')[0];
+    document.getElementById('recordTime').value = now.toTimeString().slice(0, 5);
+    
+    // Show edit mode for new record
+    document.getElementById('recordViewMode').style.display = 'none';
+    document.getElementById('recordEditMode').style.display = 'block';
+    document.getElementById('recordModalTitle').textContent = 'New Appointment Record';
+    document.getElementById('patientRecordModal').classList.add('active');
+    
+    currentRecord = null;
+}
+
+// ==========================================
+// BMI AUTO-CALCULATION
+// ==========================================
+function calculateBMI() {
+    const heightInput = document.getElementById('recordHeight');
+    const weightInput = document.getElementById('recordWeight');
+    const bmiInput = document.getElementById('recordBMI');
+    
+    if (!heightInput || !weightInput || !bmiInput) return;
+    
+    const height = parseFloat(heightInput.value);
+    const weight = parseFloat(weightInput.value);
+    
+    // Check if both values are valid numbers
+    if (height > 0 && weight > 0) {
+        // BMI = weight (kg) / (height (m))^2
+        // Convert height from cm to m
+        const heightInMeters = height / 100;
+        const bmi = weight / (heightInMeters * heightInMeters);
+        
+        // Round to 1 decimal place
+        bmiInput.value = bmi.toFixed(1);
+    } else {
+        bmiInput.value = '';
+    }
+}
+
+// Handle record form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const recordForm = document.getElementById('patientRecordForm');
+    if (recordForm) {
+        recordForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const recordId = document.getElementById('recordId').value;
+            
+            if (recordId) {
+                formData.append('action', 'updateRecord');
+            } else {
+                formData.append('action', 'addRecord');
+            }
+            
+            fetch('ajax/records.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(recordId ? 'Record updated successfully' : 'Record added successfully', 'success');
+                    closePatientRecordModal();
+                    
+                    // Reload appointment history if patient details modal is open
+                    if (currentPatient) {
+                        loadPatientAppointmentHistory(currentPatient.id, currentPatient.type);
+                    }
+                } else {
+                    showAlert(data.message || 'Error saving record', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('Error saving record', 'danger');
+            });
+        });
+    }
+    
+    // Add event listeners for BMI calculation
+    const heightInput = document.getElementById('recordHeight');
+    const weightInput = document.getElementById('recordWeight');
+    
+    if (heightInput) {
+        heightInput.addEventListener('input', calculateBMI);
+        heightInput.addEventListener('change', calculateBMI);
+    }
+    
+    if (weightInput) {
+        weightInput.addEventListener('input', calculateBMI);
+        weightInput.addEventListener('change', calculateBMI);
+    }
+});
+
